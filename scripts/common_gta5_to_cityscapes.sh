@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # model
-model="deeplab"
+model="deeplabv3"
 
 # dataset
 source="gta5"
