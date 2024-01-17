@@ -122,8 +122,8 @@ class DeepLabV3(nn.Module):
         # self.layer6 = self._make_pred_layer(
         #     ASPP, 2048, [6, 12, 18, 24], [6, 12, 18, 24], num_classes)
 
-        self.layer5 = ASPP(1024, [6, 12, 18])
-        self.layer6 = ASPP(2048, [6, 12, 18])
+        self.layer5 = ASPP(1024, num_classes, [6, 12, 18])
+        self.layer6 = ASPP(2048, num_classes, [6, 12, 18])
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -284,7 +284,7 @@ class ASPPConv(nn.Sequential):
 class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels, out_channels):
         super(ASPPPooling, self).__init__(
-            nn.AdaptiveAvgPool2d(1),
+            nn.AdaptiveAvgPool2d(32),
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True))
@@ -295,9 +295,9 @@ class ASPPPooling(nn.Sequential):
         return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
 
 class ASPP(nn.Module):
-    def __init__(self, in_channels, atrous_rates):
+    def __init__(self, in_channels, num_classes, atrous_rates):
         super(ASPP, self).__init__()
-        out_channels = 256
+        out_channels = num_classes
         modules = []
         modules.append(nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 1, bias=False),

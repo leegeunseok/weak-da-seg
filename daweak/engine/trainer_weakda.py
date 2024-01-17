@@ -101,7 +101,7 @@ class TrainerWeakda(Trainer):
                 p_feat2 = get_pooled_feat(pred2.detach(), feat2.detach())
 
             # pred1 = self.interp_source(pred1)
-            # pred2 = self.interp_source(pred2)
+            pred2 = self.interp_source(pred2)
 
             # segmentation loss
             loss_seg1 = 0  # self.seg_loss(pred1, labels)
