@@ -18,7 +18,7 @@ import daweak.util as util
 
 PER_TH = 0.1
 
-
+# global pooling
 def get_prediction(preds):
     scale = preds.shape[-1]*preds.shape[-2]
     t = preds + torch.log(torch.tensor(1/scale).cuda())
@@ -44,12 +44,18 @@ def load_threshold(dataset_name, num_class):
         m = [np.mean(c) for c in counts]
     return m
 
-
 palette = [
-    128, 64, 128, 244, 35, 232, 70, 70, 70, 102, 102, 156, 190, 153, 153, 153, 153, 153, 250, 170,
-    30, 220, 220, 0, 107, 142, 35, 152, 251, 152, 70, 130, 180, 220, 20, 60, 255, 0, 0, 0, 0, 142,
-    0, 0, 70, 0, 60, 100, 0, 80, 100, 0, 0, 230, 119, 11, 32
+    0, 0, 0, 255, 0, 0
 ]
+# palette = [
+#     0, 0, 0, 255, 0, 0, 255, 255, 0, 0, 0, 255
+# ]
+# palette = [
+#     128, 64, 128, 244, 35, 232, 70, 70, 70, 102, 102, 156, 190, 153, 153, 153, 153, 153, 250, 170,
+#     30, 220, 220, 0, 107, 142, 35, 152, 251, 152, 70, 130, 180, 220, 20, 60, 255, 0, 0, 0, 0, 142,
+#     0, 0, 70, 0, 60, 100, 0, 80, 100, 0, 0, 230, 119, 11, 32
+# ]
+
 zero_pad = 256 * 3 - len(palette)
 for i in range(zero_pad):
     palette.append(0)
@@ -144,9 +150,10 @@ class Trainer:
         cudnn.benchmark = True
 
         opt_param = model.optim_parameters(args)
-        optimizer = optim.SGD(
-            opt_param, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay
-        )
+        # optimizer = optim.SGD(
+        #     opt_param, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay
+        # )
+        optimizer = optim.AdamW(opt_param, lr=0.0001, weight_decay=0.05)  
         optimizer_D1 = optim.Adam(model_D1.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
         optimizer_D2 = optim.Adam(model_D2.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
         optimizer_wD = optim.Adam(model_wD.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
@@ -184,6 +191,7 @@ class Trainer:
         self.best_pred = 0.0
         self.best_iter = 0
         self.is_best = False
+        self.patience_count = 0
 
     def __del__(self):
         if self.logger_fid:
@@ -255,7 +263,10 @@ class Trainer:
             im_output = get_prediction(output).cpu()
             im_label = get_weak_labels(label, im_output.shape[1], self.target_th).cpu()
 
-            if self.args.dataset_target == 'cityscapes':
+            # self.interp_target = nn.Upsample(
+            #     size=(label.shape[1], label.shape[2]), mode='bilinear', align_corners=True)
+
+            if self.args.dataset_target == 'cityscapes' or self.args.dataset_target == 'ganghwa_t' or self.args.dataset_target == 'incheon_t':
                 output = self.interp_target_eval(output).cpu().data[0].numpy()
             else:
                 output = self.interp_target(output).cpu().data[0].numpy()
@@ -322,6 +333,8 @@ class Trainer:
 
         print("Per-class IoUs:")
         print(mIoUs)
+        crack_IoU = round(mIoUs[-1] * 100, 2)  ###
+        print("crack IoU: ", crack_IoU)  ###
         mIoU = round(np.nanmean(mIoUs) * 100, 2)
         print("mIoU (all classes) = {:f}".format(mIoU))
         if self.logger_fid:
@@ -334,11 +347,13 @@ class Trainer:
         if self.args.dataset_source == 'synthia':
             new_pred = mIoU_13
         else:
-            new_pred = mIoU
+            new_pred = crack_IoU  ###
+
 
         if new_pred > self.best_pred and not self.args.val_only:
             self.best_pred = new_pred
             self.best_iter = i_iter
+            self.patience_count = 0
             print(f"Storing new best model at iteration {i_iter}")
             if self.logger_fid:
                 print(f"Storing new best model at iteration {i_iter}", file=self.logger_fid)
@@ -370,4 +385,8 @@ class Trainer:
                     'wD-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
                 )
             )
+        elif new_pred <= self.best_pred and not self.args.val_only:
+            self.patience_count += self.args.save_pred_every
+            print(f"Early stopping count: {self.patience_count} of {self.args.num_steps_stop}")
+
         return new_pred
