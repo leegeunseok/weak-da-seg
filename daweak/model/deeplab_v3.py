@@ -122,8 +122,21 @@ class DeepLabV3(nn.Module):
         # self.layer6 = self._make_pred_layer(
         #     ASPP, 2048, [6, 12, 18, 24], [6, 12, 18, 24], num_classes)
 
-        self.layer5 = ASPP(1024, num_classes, [6, 12, 18])
-        self.layer6 = ASPP(2048, num_classes, [6, 12, 18])
+        self.layer5 = ASPP(1024, [6, 12, 18])
+        self.layer6 = ASPP(2048, [6, 12, 18])
+
+        self.project = nn.Sequential( 
+            nn.Conv2d(256, 48, 1, bias=False),
+            nn.BatchNorm2d(48),
+            nn.ReLU(inplace=True),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Conv2d(304, 256, 3, padding=1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, num_classes, 1)
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -161,16 +174,23 @@ class DeepLabV3(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
+        low = self.layer1(x)
+        x = self.layer2(low)
 
         x = self.layer3(x)
         f1 = x
         x1 = self.layer5(x)
+        x1 = F.interpolate(x1, size=low.shape[2:], mode='bilinear', align_corners=False)
+        f1 = F.interpolate(f1, size=low.shape[2:], mode='bilinear', align_corners=False)
+        x1 = self.classifier( torch.cat( [ self.project(low), x1 ], dim=1 ) )
 
         x2 = self.layer4(x)
         f2 = x2
         x2 = self.layer6(x2)
+        x2 = F.interpolate(x2, size=low.shape[2:], mode='bilinear', align_corners=False)
+        x2 = self.classifier( torch.cat( [ self.project(low), x2 ], dim=1 ) )
+        # print('x2 shape: ', x2.shape)
+        # print('f2 shape: ', f2.shape)
 
         if get_features:
             return x1, x2, f1, f2
@@ -217,35 +237,6 @@ class DeepLabV3(nn.Module):
         return [{'params': self.get_1x_lr_params_NOscale(), 'lr': args.learning_rate},
                 {'params': self.get_10x_lr_params(), 'lr': 10 * args.learning_rate}]
 
-
-def get_deeplabv3(num_classes=19, pre_train=None):
-    model = DeepLabV3(Bottleneck, [3, 4, 23, 3], num_classes)
-
-    if pre_train is not None:
-        model.load_state_dict(torch.load(pre_train), strict=False)
-        # missing_keys, _ = model.load_state_dict(torch.load(pre_train), strict=False)
-        # if missing_keys:
-        #     print("Missing keys:", missing_keys)
-
-        '''
-        # load pre-trained weights
-        saved_state_dict = torch.load(pre_train)
-
-        new_params = model.state_dict().copy()
-        for i in saved_state_dict:
-            # Scale.layer5.conv2d_list.3.weight
-            i_parts = i.split('.')
-            # print i_parts
-            if (not i_parts[1] == 'layer5') or (not saved_state_dict[i].shape[0] == num_classes):
-            #if not i_parts[1] == 'layer5':
-                new_params['.'.join(i_parts[1:])] = saved_state_dict[i]
-                # print i_parts
-        model.load_state_dict(new_params)
-        '''
-
-    return model
-
-
 class AtrousSeparableConvolution(nn.Module):
     """ Atrous Separable Convolution
     """
@@ -284,9 +275,9 @@ class ASPPConv(nn.Sequential):
 class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels, out_channels):
         super(ASPPPooling, self).__init__(
-            nn.AdaptiveAvgPool2d(32),
+            nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            # nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True))
 
     def forward(self, x):
@@ -295,9 +286,9 @@ class ASPPPooling(nn.Sequential):
         return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
 
 class ASPP(nn.Module):
-    def __init__(self, in_channels, num_classes, atrous_rates):
+    def __init__(self, in_channels, atrous_rates):
         super(ASPP, self).__init__()
-        out_channels = num_classes
+        out_channels = 256
         modules = []
         modules.append(nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
@@ -340,3 +331,30 @@ def convert_to_separable_conv(module):
     for name, child in module.named_children():
         new_module.add_module(name, convert_to_separable_conv(child))
     return new_module
+
+def get_deeplab_v3(num_classes=19, pre_train=None):
+    model = DeepLabV3(Bottleneck, [3, 4, 23, 3], num_classes)
+
+    if pre_train is not None:
+        model.load_state_dict(torch.load(pre_train), strict=False)
+        # missing_keys, _ = model.load_state_dict(torch.load(pre_train), strict=False)
+        # if missing_keys:
+        #     print("Missing keys:", missing_keys)
+
+        '''
+        # load pre-trained weights
+        saved_state_dict = torch.load(pre_train)
+
+        new_params = model.state_dict().copy()
+        for i in saved_state_dict:
+            # Scale.layer5.conv2d_list.3.weight
+            i_parts = i.split('.')
+            # print i_parts
+            if (not i_parts[1] == 'layer5') or (not saved_state_dict[i].shape[0] == num_classes):
+            #if not i_parts[1] == 'layer5':
+                new_params['.'.join(i_parts[1:])] = saved_state_dict[i]
+                # print i_parts
+        model.load_state_dict(new_params)
+        '''
+
+    return model

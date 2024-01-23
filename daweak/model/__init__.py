@@ -3,14 +3,14 @@
 ###########################################################################
 
 from .deeplab_multi import get_deeplab_multi
-from .deeplab_v3 import get_deeplabv3
+from .deeplab_v3 import get_deeplab_v3
 from .discriminator import get_discriminator, get_classwise_discriminator
 
 
 def get_segmentation_model(name, **kwargs):
     models = {
         'deeplab': get_deeplab_multi,
-        'deeplabv3': get_deeplabv3
+        'deeplabv3': get_deeplab_v3
     }
     return models[name.lower()](**kwargs)
 
