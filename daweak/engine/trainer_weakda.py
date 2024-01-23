@@ -98,7 +98,8 @@ class TrainerWeakda(Trainer):
             _, pred2, _, feat2 = self.model(images, get_features=True)
 
             if self.args.use_weak_cw:
-                p_feat2 = get_pooled_feat(pred2.detach(), feat2.detach())
+                _pred2 = F.interpolate(pred2, size=feat2.shape[2:], mode='bilinear', align_corners=True)
+                p_feat2 = get_pooled_feat(_pred2.detach(), feat2.detach())
 
             # pred1 = self.interp_source(pred1)
             pred2 = self.interp_source(pred2)
@@ -138,14 +139,15 @@ class TrainerWeakda(Trainer):
                         if not weak_labels_onehot[0][p[2]]:
                             continue
                         tmp = torch.softmax(tmp_interp[0, :, p[0], p[1]], dim=0)
-                        loss_point.append(-torch.log(tmp)[p[2]])
+                        loss_point.append(-torch.log(tmp + eps)[p[2]])  ###
                     loss_point = torch.mean(torch.stack(loss_point))
                 else:
                     loss_point = torch.tensor(0.)
 
                 d_pred_target2 = dropout(pred_target2)
                 if self.args.use_weak_cw:
-                    p_feat_target2 = get_pooled_feat(pred_target2.detach(), feat_target2)
+                    _p_feat_target2 = F.interpolate(pred_target2, size=feat_target2.shape[2:], mode='bilinear', align_corners=True)  ###
+                    p_feat_target2 = get_pooled_feat(_p_feat_target2.detach(), feat_target2)
                     wD_out2 = self.model_wD(p_feat_target2)
 
                 loss_weak_target2 = 0.0
@@ -296,7 +298,7 @@ class TrainerWeakda(Trainer):
             # test during training
             if self.args.val:
                 if (i_iter % self.args.save_pred_every == 0 and i_iter != 0) \
-                   or i_iter >= self.args.num_steps_stop - 1:
+                   and i_iter < self.args.num_steps - 1:  ###
                     self.validation(i_iter)
                     self.is_best = True
 
@@ -311,13 +313,18 @@ class TrainerWeakda(Trainer):
                                 (self.best_iter, self.best_pred),
                                 file=self.logger_fid,
                             )
+
+                    if self.patience_count >= self.args.num_steps_stop:  ###
+                        print(f"Early stopping at iteration {i_iter}. No improvement for {self.args.num_steps_stop} iterations.")
+                        break
+                    
                     self.model.train()
 
-            if i_iter >= self.args.num_steps_stop - 1:
-                print(f"Stop training at {self.args.num_steps_stop} ('num-steps-stop') iters")
+            if i_iter >= self.args.num_steps - 1:  ###
+                print(f"Stop training at {self.args.num_steps} ('num-steps') iters")  ###
                 if self.logger_fid:
                     print(
-                        f"Stop training at {self.args.num_steps_stop} ('num-steps-stop') iters",
+                        f"Stop training at {self.args.num_steps} ('num-steps') iters",  ###
                         file=self.logger_fid
                     )
                 break
