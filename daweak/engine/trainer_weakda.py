@@ -13,7 +13,7 @@ def get_psuedo_weak_labels(preds, th):
     return (get_prediction(preds) > th).float()
 
 
-dropout = nn.Dropout(0.1)
+dropout = nn.Dropout(0.1)  # 0.1 oracle and 0.3 for pseudo
 
 
 def get_pooled_feat(pred, feat):
@@ -281,7 +281,7 @@ class TrainerWeakda(Trainer):
                     self.optimizer_wD.step()
 
             # print loss
-            if i_iter % self.args.print_loss_every == 0 or i_iter >= self.args.num_steps_stop - 1:
+            if i_iter % self.args.print_loss_every == 0 and i_iter < self.args.num_steps - 1:  ###
                 loss_txt = (
                     'iter = {0:8d}/{1:8d}, seg1 = {2:.3f} seg2 = {3:.3f} adv1 = {4:.3f}, '
                     'adv2 = {5:.3f}, D1 = {6:.3f} D2 = {7:.3f}, weak = {8:.3f}, wadv2 = {9:.3f}, '
