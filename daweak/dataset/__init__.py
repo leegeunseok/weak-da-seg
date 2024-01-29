@@ -11,6 +11,10 @@ from .crack500_s import CRACK500SSegmentation
 from .crack500_t import CRACK500TSegmentation
 from .rissbilder_s import RissbilderSSegmentation
 from .rissbilder_t import RissbilderTSegmentation
+from .road_s import RoadSSegmentation
+from .road_t import RoadTSegmentation
+from .generalcon_s import GeneralConSSegmentation
+from .generalcon_t import GeneralConTSegmentation
 
 datasets = {
     'gta5': GTA5Segmentation,
@@ -21,7 +25,11 @@ datasets = {
     'crack500_s': CRACK500SSegmentation,
     'crack500_t': CRACK500TSegmentation,
     'rissbilder_s': RissbilderSSegmentation,
-    'rissbilder_t': RissbilderTSegmentation
+    'rissbilder_t': RissbilderTSegmentation,
+    'road_s': RoadSSegmentation,
+    'road_t': RoadTSegmentation,
+    'generalcon_s': GeneralConSSegmentation,
+    'generalcon_t': GeneralConTSegmentation
 }
 
 
