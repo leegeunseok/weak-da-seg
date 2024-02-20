@@ -1,0 +1,7 @@
+SCRIPT_DIR="/home/user/weak-da-seg-new/weak-da-seg/scripts"
+source $SCRIPT_DIR/common_crack_to_crack_new.sh
+
+snapshot_dir="snapshot/"$source"-"$target"-supervised-split"
+result_dir="result/"$source"-"$target"-supervised-split"
+
+CUDA_VISIBLE_DEVICES=1 python train_new.py --model $model --dataset-source $source --dataset-target $target --data-path-source "/home/user/WindowsShare/05. Data/00. Benchmarks/22. KhanhhaCrack/04. convert2cityscapes" --data-path-target "/home/user/WindowsShare/05. Data/00. Benchmarks/27. crackseg9k/train_val_test" --input-size-source $source_size --input-size-target $target_size --num-classes $num_classes --train-split $train_split --val-split $val_split --test-split $test_split --batch-size $batch_size --num-steps $num_steps --num-steps-stop $num_steps_stop --lambda-seg $lambda_seg --lambda-adv-target1 $lambda_adv1 --lambda-adv-target2 $lambda_adv2 --lambda-weak-cwadv2 $lambda_weak_cwadv2 --lambda-weak-target2 $lambda_weak2 --learning-rate $lr --learning-rate-D $lr_d --restore-from $pretrain --pweak-th $pweak_th --snapshot-dir $snapshot_dir --result-dir $result_dir --save-pred-every $save_step --print-loss-every $print_step --use-weak --use-pseudo --use-weak-cw --use-pixeladapt --use-pointloss --val
