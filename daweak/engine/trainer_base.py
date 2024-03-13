@@ -64,6 +64,32 @@ def colorize_mask(mask):
     return new_mask
 
 
+# class GradualUpsampler(nn.Module):
+#     def __init__(self, final_size, steps, mode='bilinear', align_corners=True):
+#         super(GradualUpsampler, self).__init__()
+#         self.final_size = final_size
+#         self.steps = steps
+#         self.mode = mode
+#         self.align_corners = align_corners
+#         self.intermediate_sizes = self.calculate_intermediate_sizes()
+
+#     def calculate_intermediate_sizes(self):
+#         sizes = []
+#         for step in range(1, self.steps + 1):
+#             intermediate_size = (
+#                 self.final_size[0] * step // self.steps,
+#                 self.final_size[1] * step // self.steps
+#             )
+#             sizes.append(intermediate_size)
+#         return sizes
+
+#     def forward(self, x):
+#         for size in self.intermediate_sizes:
+#             x = nn.functional.interpolate(x, size=size, mode=self.mode, align_corners=self.align_corners)
+#             # print(x.shape)
+#         return x
+
+
 class Trainer:
 
     def __init__(self, args):
@@ -98,7 +124,7 @@ class Trainer:
             trainset_target = get_dataset(
                 args.dataset_target, path=args.data_path_target, split=args.target_split,
                 mode='val', size=input_size_target, use_points=args.use_pointloss, **data_kwargs
-            )
+            ) 
         testset = get_dataset(
             args.dataset_target, path=args.data_path_target, split=args.test_split,
             mode='val', size=input_size_target, data_root=args.data_root
@@ -146,10 +172,10 @@ class Trainer:
         cudnn.benchmark = True
 
         opt_param = model.optim_parameters(args)
-        # optimizer = optim.SGD(
-        #     opt_param, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay
-        # )
-        optimizer = optim.AdamW(opt_param, lr=args.learning_rate, betas=(0.9, 0.999), weight_decay=0.05)  ###
+        optimizer = optim.SGD(
+            opt_param, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay
+        )
+        # optimizer = optim.AdamW(opt_param, lr=args.learning_rate, betas=(0.9, 0.999), weight_decay=0.05)  ###
         optimizer_D1 = optim.Adam(model_D1.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
         optimizer_D2 = optim.Adam(model_D2.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
         optimizer_wD = optim.Adam(model_wD.parameters(), lr=args.learning_rate_D, betas=(0.9, 0.99))
@@ -167,6 +193,8 @@ class Trainer:
             mode='bilinear',
             align_corners=True
         )
+        # self.interp_source = GradualUpsampler(final_size=input_size_source, steps=4)
+        # self.interp_target = GradualUpsampler(final_size=input_size_target, steps=4)
 
         self.model, self.model_D1, self.model_D2, self.model_wD = \
             model, model_D1, model_D2, model_wD
@@ -242,6 +270,7 @@ class Trainer:
                     loss += [torch.mean(tmp)]
         loss = torch.mean(torch.stack(loss[1:]))
         return loss
+
 
     def training(self):
         raise Exception("Abstract function. Make class derivative and implement this function ...")
@@ -342,43 +371,43 @@ class Trainer:
         else:
             new_pred = crack_IoU  ###
 
-        if new_pred > self.best_pred and not self.args.val_only:
-            self.best_pred = new_pred
-            self.best_iter = i_iter
-            self.patience_count = 0
-            print(f"Storing new best model at iteration {i_iter}")
-            if self.logger_fid:
-                print(f"Storing new best model at iteration {i_iter}", file=self.logger_fid)
-            torch.save(
-                self.model.state_dict(),
-                osp.join(
-                    self.args.snapshot_dir,
-                    'G-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
-                )
-            )
-            torch.save(
-                self.model_D1.state_dict(),
-                osp.join(
-                    self.args.snapshot_dir,
-                    'D1-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
-                )
-            )
-            torch.save(
-                self.model_D2.state_dict(),
-                osp.join(
-                    self.args.snapshot_dir,
-                    'D2-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
-                )
-            )
-            torch.save(
-                self.model_wD.state_dict(),
-                osp.join(
-                    self.args.snapshot_dir,
-                    'wD-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
-                )
-            )
-        elif new_pred <= self.best_pred and not self.args.val_only:
-            self.patience_count += self.args.save_pred_every
-            print(f"Early stopping count: {self.patience_count} of {self.args.num_steps_stop}")
+        # if new_pred > self.best_pred and not self.args.val_only:
+        #     self.best_pred = new_pred
+        #     self.best_iter = i_iter
+        #     self.patience_count = 0
+        #     print(f"Storing new best model at iteration {i_iter}")
+        #     if self.logger_fid:
+        #         print(f"Storing new best model at iteration {i_iter}", file=self.logger_fid)
+        #     torch.save(
+        #         self.model.state_dict(),
+        #         osp.join(
+        #             self.args.snapshot_dir,
+        #             'G-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
+        #         )
+        #     )
+        #     torch.save(
+        #         self.model_D1.state_dict(),
+        #         osp.join(
+        #             self.args.snapshot_dir,
+        #             'D1-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
+        #         )
+        #     )
+        #     torch.save(
+        #         self.model_D2.state_dict(),
+        #         osp.join(
+        #             self.args.snapshot_dir,
+        #             'D2-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
+        #         )
+        #     )
+        #     torch.save(
+        #         self.model_wD.state_dict(),
+        #         osp.join(
+        #             self.args.snapshot_dir,
+        #             'wD-%s-%s.pth' % (self.args.dataset_source, self.args.dataset_target)
+        #         )
+        #     )
+        # elif new_pred <= self.best_pred and not self.args.val_only:
+        #     self.patience_count += self.args.save_pred_every
+        #     print(f"Early stopping count: {self.patience_count} of {self.args.num_steps_stop}")
 
         return new_pred

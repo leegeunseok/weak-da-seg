@@ -22,8 +22,8 @@ class Options:
                             help="Path to the source directory containing the dataset.")
         parser.add_argument("--data-path-target", type=str, default='./data',
                             help="Path to the target directory containing the dataset.")
-        parser.add_argument("--num-workers", type=int, default=1,
-                            help="number of workers for multithread dataloading.")
+        parser.add_argument("--num-workers", type=int, default=0,
+                            help="number of workers for multithread dataloading.")  ###
         parser.add_argument("--ignore-label", type=int, default=255,
                             help="The index of the label to ignore during the training.")
         parser.add_argument("--input-size-source", type=str, default='1280,720',
@@ -38,6 +38,12 @@ class Options:
                             help='dataset train split for target (default: train)')
         parser.add_argument('--test-split', type=str, default='val',
                             help='dataset validation split for target (default: val)')
+        # parser.add_argument('--train-split', type=str, default='train',
+        #                     help='dataset train split (default: train)')
+        # parser.add_argument('--val-split', type=str, default='val',
+        #                     help='dataset val split (default: train)')
+        # parser.add_argument('--test-split', type=str, default='test',
+        #                     help='dataset validation split for target (default: val)')   
         # training hyper params
         parser.add_argument("--batch-size", type=int, default=1,
                             help="Number of images sent to the network in one step.")

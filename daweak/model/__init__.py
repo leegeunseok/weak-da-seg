@@ -5,6 +5,7 @@
 from .deeplab_multi import get_deeplab_multi
 from .deeplab_v3 import get_deeplab_v3
 from .discriminator import get_discriminator, get_classwise_discriminator
+# from .rotation_head import get_rotation_head
 
 
 def get_segmentation_model(name, **kwargs):
@@ -21,3 +22,7 @@ def get_discriminator_model(name, **kwargs):
     if name == 'cw_discriminator':
         models = {'cw_discriminator': get_classwise_discriminator}
     return models[name.lower()](**kwargs)
+
+# def get_rotation_head_model(name):
+#     models = {'rotation_head': get_rotation_head}
+#     return models[name.lower()]()

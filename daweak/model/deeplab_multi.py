@@ -182,19 +182,27 @@ class ResNetMulti(nn.Module):
 
     def forward(self, x, get_features=False):
         x = self.conv1(x)
+        # print('after conv1: ', x.shape)  # [1, 64, 224, 224]
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+        # print('after maxpool: ', x.shape)  # [1, 64, 113, 113]
         x = self.layer1(x)
+        # print('after layer1: ', x.shape)  # [1, 256, 113, 113]
         x = self.layer2(x)
+        # print('after layer2: ', x.shape)  # [1, 512, 57, 57]
 
         x = self.layer3(x)
+        # print('after layer3: ', x.shape)  # [1, 1024, 57, 57]
         f1 = x
         x1 = self.layer5(x)
+        # print('after layer5: ', x1.shape)  # [1, 2, 57, 57]
 
         x2 = self.layer4(x)
+        # print('after layer4: ', x2.shape)  # [1, 2048, 57, 57]
         f2 = x2
         x2 = self.layer6(x2)
+        # print('after layer6: ', x2.shape)  # [1, 2, 57, 57]
 
         if get_features:
             return x1, x2, f1, f2
@@ -237,9 +245,33 @@ class ResNetMulti(nn.Module):
             for i in b[j]:
                 yield i
 
+    def get_all_lr_params(self):
+        """
+        This generator returns all the parameters of the net. It combines
+        the functionality of get_1x_lr_params_NOscale and get_10x_lr_params.
+        """
+        # Parameters from the main layers (previously in get_1x_lr_params_NOscale)
+        main_layers = [self.conv1, self.bn1, self.layer1, self.layer2, self.layer3, self.layer4]
+
+        for layer in main_layers:
+            for module in layer.modules():
+                for param in module.parameters():
+                    if param.requires_grad:
+                        yield param
+
+        # Parameters from the last classification layers (previously in get_10x_lr_params)
+        classification_layers = [self.layer5.parameters(), self.layer6.parameters()]
+
+        for layer_params in classification_layers:
+            for param in layer_params:
+                yield param
+
+    # def optim_parameters(self, args):
+    #     return [{'params': self.get_1x_lr_params_NOscale(), 'lr': args.learning_rate},
+    #             {'params': self.get_10x_lr_params(), 'lr': 10 * args.learning_rate}]
+
     def optim_parameters(self, args):
-        return [{'params': self.get_1x_lr_params_NOscale(), 'lr': args.learning_rate},
-                {'params': self.get_10x_lr_params(), 'lr': 10 * args.learning_rate}]
+        return [{'params': self.get_all_lr_params(), 'lr': args.learning_rate}]
 
 
 def get_deeplab_multi(num_classes=19, pre_train=None):

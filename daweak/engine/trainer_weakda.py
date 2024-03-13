@@ -2,6 +2,8 @@
 # Created by: Yi-Hsuan Tsai, NEC Labs America, 2021
 ###########################################################################
 
+import os.path as osp
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,6 +16,7 @@ def get_psuedo_weak_labels(preds, th):
 
 
 dropout = nn.Dropout(0.1)  # 0.1 oracle and 0.3 for pseudo
+print('dropout: ', dropout)
 
 
 def get_pooled_feat(pred, feat):
@@ -126,9 +129,11 @@ class TrainerWeakda(Trainer):
                 if self.args.use_pseudo:
                     weak_labels_onehot = get_psuedo_weak_labels(
                         pred_target2.detach(), self.args.pweak_th)
+                    # print('pseudo weak labels: ', weak_labels_onehot)
                 else:
                     weak_labels_onehot = get_weak_labels(
                         labels_target, pred_target2.shape[1], self.target_th)
+                    # print('oracle weak labels: ', weak_labels_onehot)
                 weak_labels_onehot = weak_labels_onehot.to(self.device)
 
                 if self.args.use_pointloss:
@@ -166,6 +171,8 @@ class TrainerWeakda(Trainer):
                 D_out2 = self.model_D2(F.softmax(pred_target2, dim=1))
 
                 # adversarial loss
+                loss_adv_target1 = torch.tensor(0.0, device=self.device)
+                loss_adv_target2 = torch.tensor(0.0, device=self.device)
                 if self.args.ls_gan:
                     D_out2 = torch.clamp(torch.sigmoid(D_out2), eps, 1-eps)
                     loss_adv_target1 = 0.  # 0.5*torch.mean((D_out1 - torch.tensor(1.))**2)
@@ -228,6 +235,7 @@ class TrainerWeakda(Trainer):
                 loss_D2.backward()
                 # loss_D_value1 += loss_D1.item()
                 loss_D_value2 += loss_D2.item()
+
 
                 if self.args.use_weak_cw:
                     D_weak_out2 = self.model_wD(p_feat2.detach())
@@ -320,7 +328,7 @@ class TrainerWeakda(Trainer):
                     
                     self.model.train()
 
-            if i_iter >= self.args.num_steps - 1:  ###
+            if i_iter > self.args.num_steps:  ###
                 print(f"Stop training at {self.args.num_steps} ('num-steps') iters")  ###
                 if self.logger_fid:
                     print(
@@ -328,3 +336,34 @@ class TrainerWeakda(Trainer):
                         file=self.logger_fid
                     )
                 break
+
+            if i_iter != 0 and i_iter % self.args.save_pred_every == 0 and not self.args.val_only:
+                print(f"Saving checkpoint at iteration {i_iter}")
+                torch.save(
+                    self.model.state_dict(),
+                    osp.join(
+                        self.args.snapshot_dir,
+                        'G-%s-%s-%d.pth' % (self.args.dataset_source, self.args.dataset_target, i_iter)
+                    )
+                )
+                torch.save(
+                    self.model_D1.state_dict(),
+                    osp.join(
+                        self.args.snapshot_dir,
+                        'D1-%s-%s-%d.pth' % (self.args.dataset_source, self.args.dataset_target, i_iter)
+                    )
+                )
+                torch.save(
+                    self.model_D2.state_dict(),
+                    osp.join(
+                        self.args.snapshot_dir,
+                        'D2-%s-%s-%d.pth' % (self.args.dataset_source, self.args.dataset_target, i_iter)
+                    )
+                )
+                torch.save(
+                    self.model_wD.state_dict(),
+                    osp.join(
+                        self.args.snapshot_dir,
+                        'wD-%s-%s-%d.pth' % (self.args.dataset_source, self.args.dataset_target, i_iter)
+                    )
+                )

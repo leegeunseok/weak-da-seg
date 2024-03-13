@@ -10,7 +10,7 @@ import json
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-class GeneralConTSegmentation(data.Dataset):
+class DeepCrackTSegmentation(data.Dataset):
     def __init__(
             self,
             dataset=None,
@@ -29,7 +29,7 @@ class GeneralConTSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((139.69768, 137.22803, 130.96191), dtype=np.float32)
+        self.mean = np.array((152.70589, 149.24780,  144.14413), dtype=np.float32)
         self.use_points = use_points
 
         # label mapping
@@ -91,7 +91,7 @@ class GeneralConTSegmentation(data.Dataset):
 
         # resize
         image = image.resize(self.size, Image.BICUBIC)
-        label = label.resize(self.size, Image.NEAREST)
+        # label = label.resize(self.size, Image.NEAREST)
 
         image = np.asarray(image, np.float32)
         label = np.asarray(label, np.float32)

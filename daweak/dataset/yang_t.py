@@ -10,7 +10,7 @@ import json
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-class GeneralConTSegmentation(data.Dataset):
+class YangTSegmentation(data.Dataset):
     def __init__(
             self,
             dataset=None,
@@ -29,7 +29,7 @@ class GeneralConTSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((139.69768, 137.22803, 130.96191), dtype=np.float32)
+        self.mean = np.array((142.78117, 139.95343, 135.29352), dtype=np.float32)
         self.use_points = use_points
 
         # label mapping
