@@ -9,7 +9,7 @@ from PIL import Image, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-class RoadSSegmentation(data.Dataset):
+class ConcreteSSegmentation(data.Dataset):
     def __init__(
             self,
             dataset=None,
@@ -28,7 +28,7 @@ class RoadSSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((121.760445, 122.592890, 123.217285), dtype=np.float32)
+        self.mean = np.array((157.06076, 151.85211, 144.79955), dtype=np.float32)
         self.use_pixeladapt = use_pixeladapt
 
         # load image list
