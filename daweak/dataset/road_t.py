@@ -91,7 +91,7 @@ class RoadTSegmentation(data.Dataset):
 
         # resize
         image = image.resize(self.size, Image.BICUBIC)
-        # label = label.resize(self.size, Image.NEAREST)
+        label = label.resize(self.size, Image.NEAREST)
 
         image = np.asarray(image, np.float32)
         label = np.asarray(label, np.float32)
