@@ -4,27 +4,31 @@
 model="deeplab"
 
 # dataset
-source="cracktree200_s"
-target="cracktree200_t"
+source="road_s"
+target="road_t"
 # gaps_s, gaps_t, cfd_s, cfd_t
 # deepcrack_s, deepcrack_t, cracktree200_s, cracktree200_t
 # crack500_s, crack500_t, rissbilder_s, rissbilder_t
 # kaggle_s, kaggle_t
 # yang_s, yang_t
+# road_s, road_t
+# concrete_s, concrete_t
 
-if [ "$source" = "cracktree200_s" ]
+if [ "$source" = "road_s" ]
 then
-    source_path="/home/user/WindowsShare/05. Data/00. Benchmarks/22. KhanhhaCrack/06. dilation"
+    source_path="/home/user/WindowsShare/05. Data/00. Benchmarks/33. DA/road"
 fi
 # /home/user/WindowsShare/05. Data/00. Benchmarks/22. KhanhhaCrack/04. convert2cityscapes
 # /home/user/WindowsShare/05. Data/00. Benchmarks/22. KhanhhaCrack/06. dilation
 # /home/user/WindowsShare/05. Data/00. Benchmarks/27. crackseg9k/convert2cityscapes
 # /home/user/WindowsShare/05. Data/00. Benchmarks/23. KaggleCrack/06. dilation
 # /home/user/WindowsShare/05. Data/00. Benchmarks/26. Crack_Yang/01.convert2cityscapes
+# /home/user/WindowsShare/05. Data/00. Benchmarks/33. DA/road
+# /home/user/WindowsShare/05. Data/00. Benchmarks/33. DA/concrete
 
-if [ "$target" = "cracktree200_t" ]
+if [ "$target" = "road_t" ]
 then
-    target_path="/home/user/WindowsShare/05. Data/00. Benchmarks/22. KhanhhaCrack/06. dilation"
+    target_path="/home/user/WindowsShare/05. Data/00. Benchmarks/33. DA/road"
 fi
 
 # 448,448
@@ -32,18 +36,20 @@ fi
 # 400,400
 # 1008,756
 # 306,306
+# 448,448
+# 448,448
 
-if [ "$source" = "cracktree200_s" ]
+if [ "$source" = "road_s" ]
 then
     source_size="448,448"
 fi
 
-if [ "$target" = "cracktree200_t" ]
+if [ "$target" = "road_t" ]
 then
     target_size="448,448"
 fi
 
-if [ "$source" = "cracktree200_s" ]
+if [ "$source" = "road_s" ]
 then
     num_classes=2
 fi
@@ -60,7 +66,7 @@ num_steps_stop=121000
 lambda_seg=0.0
 lambda_adv1=0.0
 lambda_adv2=0.001  # 0.001
-lambda_weak2=0.01  # 0.01 for pseudo, 0.2 for oracle
+lambda_weak2=0.2  # 0.01 for pseudo, 0.2 for oracle
 lambda_weak_cwadv2=0.001  # 0.001
 
 lr=2.5e-4
