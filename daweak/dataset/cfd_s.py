@@ -7,6 +7,8 @@ import numpy as np
 from torch.utils import data
 from PIL import Image, ImageFile
 
+from .transform import Dilate, RandomFlipLR, RandomFlipUD  ### 24.03.26
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class CFDSSegmentation(data.Dataset):
@@ -19,7 +21,9 @@ class CFDSSegmentation(data.Dataset):
             data_root=None,
             max_iters=None,
             size=(256, 256),
-            use_pixeladapt=False
+            use_pixeladapt=False,
+            dilation_target_class=1,  ### 24.03.26
+            dilation_kernel_size=(6,6)  ### 24.03.26
     ):
         self.dataset = dataset
         self.path = path
@@ -30,6 +34,8 @@ class CFDSSegmentation(data.Dataset):
         self.ignore_label = 255
         self.mean = np.array((129.57191, 133.68655, 138.82880), dtype=np.float32)
         self.use_pixeladapt = use_pixeladapt
+
+        self.dilation = Dilate(target_class=dilation_target_class, kernel_size=dilation_kernel_size)  ### 24.03.26
 
         # load image list
         list_path = osp.join(self.data_root, '%s_list/%s.txt' % (self.dataset, self.split))
@@ -57,6 +63,9 @@ class CFDSSegmentation(data.Dataset):
                     "name": name
                 })
 
+        self.random_flip_lr = RandomFlipLR()  ### 24.03.26
+        self.random_flip_ud = RandomFlipUD()  ### 24.03.26
+
     def __len__(self):
         return len(self.files)
 
@@ -72,12 +81,27 @@ class CFDSSegmentation(data.Dataset):
         label = label.resize(self.size, Image.NEAREST)
 
         image = np.asarray(image, np.float32)
-        label = np.asarray(label, np.float32)
+        label = np.asarray(label, np.uint8)  ### 24.03.26
 
         # re-assign labels to match the format of Cityscapes
-        label_copy = 255 * np.ones(label.shape, dtype=np.float32)
+        label_copy = 255 * np.ones(label.shape, dtype=np.uint8)  ### 24.03.26
         for k, v in self.id_to_trainid.items():
             label_copy[label == k] = v
+
+        # Apply transformations
+        results = {'image': image, 'segmap': label_copy}  ### 24.03.26
+        results = self.random_flip_lr(results)  ### 24.03.26
+        results = self.random_flip_ud(results)  ### 24.03.26
+
+        image = results['image']  ### 24.03.26
+        label_copy = results['segmap']  ### 24.03.26
+
+        # Apply dilation transformation
+        # print('num of 1 before dilation: ', np.count_nonzero(label_copy == 1))
+        sample = {'segmap': label_copy}  ### 24.03.26
+        self.dilation(sample)  ### 24.03.26
+        label_copy = sample['segmap']  ### 24.03.26
+        # print('num of 1 after dilation: ', np.count_nonzero(label_copy == 1))
 
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR
