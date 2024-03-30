@@ -7,6 +7,8 @@ import numpy as np
 from torch.utils import data
 from PIL import Image, ImageFile
 import json
+import cv2  #################
+import random  #################
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -29,7 +31,7 @@ class YangTSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((142.78117, 139.95343, 135.29352), dtype=np.float32)
+        self.mean = np.array((135.29352, 139.95343, 142.78117), dtype=np.float32)
         self.use_points = use_points
 
         # label mapping
@@ -100,23 +102,63 @@ class YangTSegmentation(data.Dataset):
         if self.mode == 'val':
             label = self.label_mapping(label, self.mapping)
 
+        ###################################################################################################################################
+        flip_type = 'none'
+        if self.split == 'train':
+            # Random horizontal flip
+            if random.random() > 0.5:
+                image = np.flip(image, axis=1)
+                label = np.flip(label, axis=1)
+                flip_type = 'horizontal'
+
+            # Random vertical flip
+            if random.random() > 0.5:
+                image = np.flip(image, axis=0)
+                label = np.flip(label, axis=0)
+                if flip_type == 'none':
+                    flip_type = 'vertical'
+                elif flip_type == 'horizontal':
+                    flip_type = 'ho_ver'           
+
         point_label_list = []
         if self.use_points:
             point_label_list = self.point_labels[index]
+            # print('point_label_list_1: ', point_label_list)
+            if flip_type != 'none':
+                for p in point_label_list:
+                    if flip_type == 'horizontal' or flip_type == 'ho_ver':
+                        # Flip x coordinate
+                        p[1] = self.size[1] - 1 - p[1]
+                    if flip_type == 'vertical' or flip_type == 'ho_ver':
+                        # Flip y coordinate
+                        p[0] = self.size[0] - 1 - p[0]
+
             tmp_label = Image.fromarray(label.astype('uint8')).resize(self.size, Image.NEAREST)
             tmp_label = np.asarray(tmp_label, np.float32)
             categories = []
+            # print('point_label_list_2: ', point_label_list)
             for i, p in enumerate(point_label_list):
                 categories.append(tmp_label[tuple(p)])
             point_label_list = np.concatenate([np.array(point_label_list),
                                                np.array(categories).reshape(-1, 1)], axis=1)
+            # print(name, point_label_list)
+
+        # convert label for dilation
+        label_for_dilation = label.astype(np.uint8)
+        # define the dilation kernel
+        kernel = np.ones((6,6), np.uint8)
+        # apply dilation
+        dilated_label = cv2.dilate(label_for_dilation, kernel, iterations=1)
+        # convert dilated_label back to float32
+        dilated_label = dilated_label.astype(np.float32)
+        ##############################################################################################################################
 
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR
         image -= self.mean
         image = image.transpose((2, 0, 1))
         if self.mode == 'val':
-            return image.copy(), label.copy(), np.array(size), name, point_label_list.copy()
+            return image.copy(), dilated_label.copy(), np.array(size), name, point_label_list.copy()  ##################
         else:
             return image.copy(), np.array(size), name
 

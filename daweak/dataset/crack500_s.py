@@ -6,6 +6,8 @@ import os.path as osp
 import numpy as np
 from torch.utils import data
 from PIL import Image, ImageFile
+import cv2  ####################
+import random  #################
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -28,7 +30,7 @@ class CRACK500SSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((125.20032557, 126.14937032, 126.72511472), dtype=np.float32)
+        self.mean = np.array((126.72511472, 126.14937032, 125.20032557), dtype=np.float32)
         self.use_pixeladapt = use_pixeladapt
 
         # load image list
@@ -79,9 +81,40 @@ class CRACK500SSegmentation(data.Dataset):
         for k, v in self.id_to_trainid.items():
             label_copy[label == k] = v
 
+        ####################################################################
+        flip_type = 'none'
+        # Random horizontal flip
+        if random.random() > 0.5:
+            image = np.flip(image, axis=1)
+            label_copy = np.flip(label_copy, axis=1)
+            flip_type = 'horizontal'
+
+        # Random vertical flip
+        if random.random() > 0.5:
+            image = np.flip(image, axis=0)
+            label_copy = np.flip(label_copy, axis=0)
+            if flip_type == 'none':
+                flip_type = 'vertical'
+            elif flip_type == 'horizontal':
+                flip_type = 'ho_ver'
+
+        # convert label for dilation
+        label_for_dilation = label_copy.astype(np.uint8)
+        # define the dilation kernel
+        kernel = np.ones((6,6), np.uint8)
+        # apply dilation
+        dilated_label = cv2.dilate(label_for_dilation, kernel, iterations=1)
+        # convert dilated_label back to float32
+        dilated_label = dilated_label.astype(np.float32)
+        ####################################################################
+
+        # # # Convert back to PIL to save
+        # aug_label_to_save = Image.fromarray(dilated_label.astype('uint8'))
+        # aug_label_to_save.save(f'/home/user/weak-da-seg-new/weak-da-seg/tmp/aug/source/{name}')
+
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR
         image -= self.mean
         image = image.transpose((2, 0, 1))
 
-        return image.copy(), label_copy.copy(), np.array(size), name
+        return image.copy(), dilated_label.copy(), np.array(size), name  #####################
