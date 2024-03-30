@@ -74,10 +74,10 @@ class CRACK500SSegmentation(data.Dataset):
         label = label.resize(self.size, Image.NEAREST)
 
         image = np.asarray(image, np.float32)
-        label = np.asarray(label, np.float32)
+        label = np.asarray(label, np.uint8)
 
         # re-assign labels to match the format of Cityscapes
-        label_copy = 255 * np.ones(label.shape, dtype=np.float32)
+        label_copy = 255 * np.ones(label.shape, dtype=np.uint8)
         for k, v in self.id_to_trainid.items():
             label_copy[label == k] = v
 
@@ -107,10 +107,6 @@ class CRACK500SSegmentation(data.Dataset):
         # convert dilated_label back to float32
         dilated_label = dilated_label.astype(np.float32)
         ####################################################################
-
-        # # # Convert back to PIL to save
-        # aug_label_to_save = Image.fromarray(dilated_label.astype('uint8'))
-        # aug_label_to_save.save(f'/home/user/weak-da-seg-new/weak-da-seg/tmp/aug/source/{name}')
 
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR

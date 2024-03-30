@@ -51,7 +51,7 @@ class CRACK500TSegmentation(data.Dataset):
                     self.path, "gtFine/%s/%s_gtFine_labelIds.png" % (self.split, label_line[:-16])
                 )
                 label = Image.open(name).resize(self.size, Image.NEAREST)
-                label = np.array(label).astype('float32')
+                label = np.array(label).astype(np.uint8)
                 label = self.label_mapping(label, self.mapping)
                 choose_idx = []
                 set_label = set(label.reshape(-1)) - {255}
@@ -96,7 +96,7 @@ class CRACK500TSegmentation(data.Dataset):
         # label = label.resize(self.size, Image.NEAREST)
 
         image = np.asarray(image, np.float32)
-        label = np.asarray(label, np.float32)
+        label = np.asarray(label, np.uint8)
 
         # label mapping
         if self.mode == 'val':
@@ -134,7 +134,7 @@ class CRACK500TSegmentation(data.Dataset):
                         p[0] = self.size[0] - 1 - p[0]
 
             tmp_label = Image.fromarray(label.astype('uint8')).resize(self.size, Image.NEAREST)
-            tmp_label = np.asarray(tmp_label, np.float32)
+            tmp_label = np.asarray(tmp_label, np.uint8)
             categories = []
             # print('point_label_list_2: ', point_label_list)
             for i, p in enumerate(point_label_list):
