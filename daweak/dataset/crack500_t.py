@@ -7,8 +7,8 @@ import numpy as np
 from torch.utils import data
 from PIL import Image, ImageFile
 import json
-
-from .transform import Dilate, RandomFlipLR, RandomFlipUD
+import cv2  #################
+import random  #################
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -22,9 +22,7 @@ class CRACK500TSegmentation(data.Dataset):
             data_root=None,
             max_iters=None,
             size=(256, 256),
-            use_points=False,
-            dilation_target_class=1,
-            dilation_kernel_size=(6,6)
+            use_points=False
     ):
         self.dataset = dataset
         self.path = path
@@ -33,10 +31,8 @@ class CRACK500TSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((125.20032557, 126.14937032, 126.72511472), dtype=np.float32)
+        self.mean = np.array((126.72511472, 126.14937032, 125.20032557), dtype=np.float32)
         self.use_points = use_points
-
-        self.dilation = Dilate(target_class=dilation_target_class, kernel_size=dilation_kernel_size)
 
         # label mapping
         with open(osp.join(self.data_root, '%s_list/info.json' % self.dataset), 'r') as fp:
@@ -84,9 +80,6 @@ class CRACK500TSegmentation(data.Dataset):
                 "label": label_file,
                 "name": name
             })
-            
-        self.random_flip_lr = RandomFlipLR()  
-        self.random_flip_ud = RandomFlipUD()
 
     def __len__(self):
         return len(self.files)
@@ -109,39 +102,69 @@ class CRACK500TSegmentation(data.Dataset):
         if self.mode == 'val':
             label = self.label_mapping(label, self.mapping)
 
+        ###################################################################################################################################
+        flip_type = 'none'
         if self.split == 'train':
-            # Apply transformations
-            results = {'image': image, 'segmap': label} 
-            results = self.random_flip_lr(results)  
-            results = self.random_flip_ud(results) 
+            # Random horizontal flip
+            if random.random() > 0.5:
+                image = np.flip(image, axis=1)
+                label = np.flip(label, axis=1)
+                flip_type = 'horizontal'
 
-            image = results['image']  
-            label = results['segmap']  
-
-        # Apply dilation transformation
-        # print('num of 1 before dilation: ', np.count_nonzero(label == 1))
-        sample = {'segmap': label}  
-        self.dilation(sample)  
-        label = sample['segmap']
-        # print('num of 1 after dilation: ', np.count_nonzero(label == 1))
+            # Random vertical flip
+            if random.random() > 0.5:
+                image = np.flip(image, axis=0)
+                label = np.flip(label, axis=0)
+                if flip_type == 'none':
+                    flip_type = 'vertical'
+                elif flip_type == 'horizontal':
+                    flip_type = 'ho_ver'           
 
         point_label_list = []
         if self.use_points:
             point_label_list = self.point_labels[index]
+            # print('point_label_list_1: ', point_label_list)
+            if flip_type != 'none':
+                for p in point_label_list:
+                    if flip_type == 'horizontal' or flip_type == 'ho_ver':
+                        # Flip x coordinate
+                        p[1] = self.size[1] - 1 - p[1]
+                    if flip_type == 'vertical' or flip_type == 'ho_ver':
+                        # Flip y coordinate
+                        p[0] = self.size[0] - 1 - p[0]
+
             tmp_label = Image.fromarray(label.astype('uint8')).resize(self.size, Image.NEAREST)
             tmp_label = np.asarray(tmp_label, np.uint8)
             categories = []
+            # print('point_label_list_2: ', point_label_list)
             for i, p in enumerate(point_label_list):
                 categories.append(tmp_label[tuple(p)])
             point_label_list = np.concatenate([np.array(point_label_list),
                                                np.array(categories).reshape(-1, 1)], axis=1)
+            # print(name, point_label_list)
+
+        # convert label for dilation
+        label_for_dilation = label.astype(np.uint8)
+        # define the dilation kernel
+        kernel = np.ones((6,6), np.uint8)
+        # apply dilation
+        dilated_label = cv2.dilate(label_for_dilation, kernel, iterations=1)
+        # convert dilated_label back to float32
+        dilated_label = dilated_label.astype(np.float32)
+        ##############################################################################################################################
+
+        # # # Convert back to PIL to save
+        # image_to_save = Image.fromarray(image.astype('uint8'))
+        # image_to_save.save(f'/home/user/weak-da-seg-new/weak-da-seg/tmp/crack500_point/leftImg8bit/train/{name}_{flip_type}.png')
+        # label_to_save = Image.fromarray(label.astype('uint8'))
+        # label_to_save.save(f'/home/user/weak-da-seg-new/weak-da-seg/tmp/crack500_point/gtFine/train/{name}_{flip_type}.png') 
 
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR
         image -= self.mean
         image = image.transpose((2, 0, 1))
         if self.mode == 'val':
-            return image.copy(), label.copy(), np.array(size), name, point_label_list.copy()
+            return image.copy(), dilated_label.copy(), np.array(size), name, point_label_list.copy()  ##################
         else:
             return image.copy(), np.array(size), name
 

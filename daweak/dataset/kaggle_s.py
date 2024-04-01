@@ -6,8 +6,8 @@ import os.path as osp
 import numpy as np
 from torch.utils import data
 from PIL import Image, ImageFile
-# import random
-from .transform import Dilate, RandomFlipLR, RandomFlipUD
+import cv2  ####################
+import random  #################
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -21,9 +21,7 @@ class KaggleSSegmentation(data.Dataset):
             data_root=None,
             max_iters=None,
             size=(256, 256),
-            use_pixeladapt=False,
-            dilation_target_class=1,  ### 24.03.26
-            dilation_kernel_size=(6,6)
+            use_pixeladapt=False
     ):
         self.dataset = dataset
         self.path = path
@@ -32,10 +30,8 @@ class KaggleSSegmentation(data.Dataset):
         self.data_root = data_root
         self.size = size
         self.ignore_label = 255
-        self.mean = np.array((182.95078, 173.42516, 162.03500), dtype=np.float32)
+        self.mean = np.array((162.03500, 173.42516, 182.95078), dtype=np.float32)
         self.use_pixeladapt = use_pixeladapt
-
-        self.dilation = Dilate(target_class=dilation_target_class, kernel_size=dilation_kernel_size)
 
         # load image list
         list_path = osp.join(self.data_root, '%s_list/%s.txt' % (self.dataset, self.split))
@@ -63,9 +59,6 @@ class KaggleSSegmentation(data.Dataset):
                     "name": name
                 })
 
-        self.random_flip_lr = RandomFlipLR()  ### 24.03.26
-        self.random_flip_ud = RandomFlipUD()
-
     def __len__(self):
         return len(self.files)
 
@@ -78,19 +71,7 @@ class KaggleSSegmentation(data.Dataset):
 
         # resize
         image = image.resize(self.size, Image.BICUBIC)
-        label = label.resize(self.size, Image.NEAREST)
-
-        # # Random horizontal flipping
-        # if random.random() > 0.5:
-        #     # print('horizontal flip')
-        #     image = image.transpose(Image.FLIP_LEFT_RIGHT)
-        #     label = label.transpose(Image.FLIP_LEFT_RIGHT)
-
-        # # Random vertical flipping
-        # if random.random() > 0.5:
-        #     # print('vertical flip')
-        #     image = image.transpose(Image.FLIP_TOP_BOTTOM)
-        #     label = label.transpose(Image.FLIP_TOP_BOTTOM)       
+        label = label.resize(self.size, Image.NEAREST)      
 
         image = np.asarray(image, np.float32)
         label = np.asarray(label, np.uint8)
@@ -100,25 +81,36 @@ class KaggleSSegmentation(data.Dataset):
         for k, v in self.id_to_trainid.items():
             label_copy[label == k] = v
 
-        # Apply transformations
-        results = {'image': image, 'segmap': label_copy}  ### 24.03.26
-        results = self.random_flip_lr(results)  ### 24.03.26
-        results = self.random_flip_ud(results)  ### 24.03.26
+        ####################################################################
+        flip_type = 'none'
+        # Random horizontal flip
+        if random.random() > 0.5:
+            image = np.flip(image, axis=1)
+            label_copy = np.flip(label_copy, axis=1)
+            flip_type = 'horizontal'
 
-        image = results['image']  ### 24.03.26
-        label_copy = results['segmap']  ### 24.03.26
+        # Random vertical flip
+        if random.random() > 0.5:
+            image = np.flip(image, axis=0)
+            label_copy = np.flip(label_copy, axis=0)
+            if flip_type == 'none':
+                flip_type = 'vertical'
+            elif flip_type == 'horizontal':
+                flip_type = 'ho_ver'
 
-        # Apply dilation transformation
-        # print('num of 1 before dilation: ', np.count_nonzero(label_copy == 1))
-        sample = {'segmap': label_copy}  ### 24.03.26
-        self.dilation(sample)  ### 24.03.26
-        label_copy = sample['segmap']  ### 24.03.26
-        # print('num of 1 after dilation: ', np.count_nonzero(label_copy == 1))
-
+        # convert label for dilation
+        label_for_dilation = label_copy.astype(np.uint8)
+        # define the dilation kernel
+        kernel = np.ones((6,6), np.uint8)
+        # apply dilation
+        dilated_label = cv2.dilate(label_for_dilation, kernel, iterations=1)
+        # convert dilated_label back to float32
+        dilated_label = dilated_label.astype(np.float32)
+        ####################################################################
 
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR
         image -= self.mean
         image = image.transpose((2, 0, 1))
 
-        return image.copy(), label_copy.copy(), np.array(size), name
+        return image.copy(), dilated_label.copy(), np.array(size), name  #####################

@@ -6,8 +6,8 @@ import os.path as osp
 import numpy as np
 from torch.utils import data
 from PIL import Image, ImageFile
-
-from .transform import Dilate, RandomFlipLR, RandomFlipUD 
+import cv2  ####################
+import random  #################
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -21,9 +21,7 @@ class Cracktree200SSegmentation(data.Dataset):
             data_root=None,
             max_iters=None,
             size=(256, 256),
-            use_pixeladapt=False,
-            dilation_target_class=1,  
-            dilation_kernel_size=(6,6) 
+            use_pixeladapt=False
     ):
         self.dataset = dataset
         self.path = path
@@ -34,8 +32,6 @@ class Cracktree200SSegmentation(data.Dataset):
         self.ignore_label = 255
         self.mean = np.array((136.32666, 136.32666, 136.32666), dtype=np.float32)
         self.use_pixeladapt = use_pixeladapt
-
-        self.dilation = Dilate(target_class=dilation_target_class, kernel_size=dilation_kernel_size)
 
         # load image list
         list_path = osp.join(self.data_root, '%s_list/%s.txt' % (self.dataset, self.split))
@@ -63,9 +59,6 @@ class Cracktree200SSegmentation(data.Dataset):
                     "name": name
                 })
 
-        self.random_flip_lr = RandomFlipLR()  
-        self.random_flip_ud = RandomFlipUD()
-
     def __len__(self):
         return len(self.files)
 
@@ -88,24 +81,36 @@ class Cracktree200SSegmentation(data.Dataset):
         for k, v in self.id_to_trainid.items():
             label_copy[label == k] = v
 
-        # Apply transformations
-        results = {'image': image, 'segmap': label_copy}  
-        results = self.random_flip_lr(results)  
-        results = self.random_flip_ud(results) 
+        ####################################################################
+        flip_type = 'none'
+        # Random horizontal flip
+        if random.random() > 0.5:
+            image = np.flip(image, axis=1)
+            label_copy = np.flip(label_copy, axis=1)
+            flip_type = 'horizontal'
 
-        image = results['image']  
-        label_copy = results['segmap']  
+        # Random vertical flip
+        if random.random() > 0.5:
+            image = np.flip(image, axis=0)
+            label_copy = np.flip(label_copy, axis=0)
+            if flip_type == 'none':
+                flip_type = 'vertical'
+            elif flip_type == 'horizontal':
+                flip_type = 'ho_ver'
 
-        # Apply dilation transformation
-        # print('num of 1 before dilation: ', np.count_nonzero(label_copy == 1))
-        sample = {'segmap': label_copy}  
-        self.dilation(sample)  
-        label_copy = sample['segmap']  
-        # print('num of 1 after dilation: ', np.count_nonzero(label_copy == 1))
+        # convert label for dilation
+        label_for_dilation = label_copy.astype(np.uint8)
+        # define the dilation kernel
+        kernel = np.ones((6,6), np.uint8)
+        # apply dilation
+        dilated_label = cv2.dilate(label_for_dilation, kernel, iterations=1)
+        # convert dilated_label back to float32
+        dilated_label = dilated_label.astype(np.float32)
+        ####################################################################
 
         size = image.shape
         image = image[:, :, ::-1]  # change to BGR
         image -= self.mean
         image = image.transpose((2, 0, 1))
 
-        return image.copy(), label_copy.copy(), np.array(size), name
+        return image.copy(), dilated_label.copy(), np.array(size), name  #####################
